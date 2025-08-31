@@ -187,12 +187,6 @@ export function Spreadsheet({ rows: initialRows = 20, cols: initialCols = 26 }: 
     }
   }, [cells])
 
-  const handleAICellsUpdated = useCallback(async (updates: Record<string, string>) => {
-    for (const [cellKey, value] of Object.entries(updates)) {
-      await updateCell(cellKey, value)
-    }
-  }, [updateCell])
-
   // Handle cell edit
   const handleCellEdit = useCallback(async (cellKey: string, value: string) => {
     await updateCell(cellKey, value)
@@ -543,7 +537,6 @@ export function Spreadsheet({ rows: initialRows = 20, cols: initialCols = 26 }: 
       <AIAssistant
         cells={cells}
         onApplyFormula={(cell, formula) => updateCell(cell, formula)}
-        onUpdateCells={handleAICellsUpdated}
       />
     </div>
   )

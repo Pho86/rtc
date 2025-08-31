@@ -4,13 +4,11 @@ import { aiService, type AIAnalysis } from '../services/AIService'
 interface AIAssistantProps {
   cells: Record<string, { value: string; formula?: string }>
   onApplyFormula: (cell: string, formula: string) => void
-  onUpdateCells: (updates: Record<string, string>) => void
 }
 
 export function AIAssistant({ 
   cells, 
-  onApplyFormula, 
-  onUpdateCells 
+  onApplyFormula 
 }: AIAssistantProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null)

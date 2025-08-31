@@ -1,7 +1,6 @@
 import type { FormDefinition, FormSubmission, Department, FormValidationResult } from '../types'
 import type { Language } from './TranslationService'
 import { authService } from './AuthService'
-import { multilingualFormService } from './MultilingualFormService'
 
 class FormService {
   private readonly SUBMISSIONS_KEY = 'rtc_form_submissions'
