@@ -8,6 +8,7 @@
   line-height: 1.5;
   font-weight: 400;
 
+  overflow-x: hidden;
   color-scheme: light;
   color: #213547;
   background-color: #ffffff;

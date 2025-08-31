@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { translationService } from '../services/TranslationService'
 import type { Language, TranslationMode } from '../services/TranslationService'
 
@@ -39,7 +39,7 @@ export function LanguageSelector({
   }
 
   return (
-    <div className="relative">
+    <div className="relative mr-4">
       {/* Language Selector Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}

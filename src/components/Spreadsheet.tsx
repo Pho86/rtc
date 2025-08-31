@@ -1,7 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { SpreadsheetToolbar } from './SpreadsheetToolbar'
 import { LanguageSelector } from './LanguageSelector'
+import { AIAssistant } from './AIAssistant'
 import { translationService } from '../services/TranslationService'
+import { aiService } from '../services/AIService'
 import type { Language, TranslationMode } from '../services/TranslationService'
 
 interface Cell {
@@ -15,11 +17,13 @@ interface SpreadsheetProps {
   cols?: number
 }
 
-export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
+export function Spreadsheet({ rows: initialRows = 20, cols: initialCols = 26 }: SpreadsheetProps) {
   const [cells, setCells] = useState<Record<string, Cell>>({})
   const [selectedCell, setSelectedCell] = useState<string>('A1')
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [rows, setRows] = useState(initialRows)
+  const [cols, setCols] = useState(initialCols)
   
   // Translation state
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en')
@@ -52,6 +56,25 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
     return cell.value
   }, [cells])
 
+  // Get values from a range
+  const getRangeValues = useCallback((start: string, end: string): (string | number)[] => {
+    const values: (string | number)[] = []
+    const [startCol, startRow] = [start.match(/[A-Z]+/)![0], parseInt(start.match(/\d+/)![0])]
+    const [endCol, endRow] = [end.match(/[A-Z]+/)![0], parseInt(end.match(/\d+/)![0])]
+    
+    const startColIndex = startCol.charCodeAt(0) - 65
+    const endColIndex = endCol.charCodeAt(0) - 65
+    
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startColIndex; col <= endColIndex; col++) {
+        const cellKey = `${String.fromCharCode(65 + col)}${row}`
+        values.push(getCellValue(cellKey))
+      }
+    }
+    
+    return values
+  }, [getCellValue])
+
   // Evaluate formula
   const evaluateFormula = useCallback((formula: string): string | number => {
     try {
@@ -76,29 +99,10 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
       
       // eslint-disable-next-line no-eval
       return eval(cleanExpression)
-    } catch (error) {
+    } catch {
       return '#ERROR!'
     }
-  }, [getCellValue])
-
-  // Get values from a range
-  const getRangeValues = useCallback((start: string, end: string): (string | number)[] => {
-    const values: (string | number)[] = []
-    const [startCol, startRow] = [start.match(/[A-Z]+/)![0], parseInt(start.match(/\d+/)![0])]
-    const [endCol, endRow] = [end.match(/[A-Z]+/)![0], parseInt(end.match(/\d+/)![0])]
-    
-    const startColIndex = startCol.charCodeAt(0) - 65
-    const endColIndex = endCol.charCodeAt(0) - 65
-    
-    for (let row = startRow; row <= endRow; row++) {
-      for (let col = startColIndex; col <= endColIndex; col++) {
-        const cellKey = `${String.fromCharCode(65 + col)}${row}`
-        values.push(getCellValue(cellKey))
-      }
-    }
-    
-    return values
-  }, [getCellValue])
+  }, [getCellValue, getRangeValues])
 
   // Update cell value with translation
   const updateCell = useCallback(async (cellKey: string, value: string) => {
@@ -143,12 +147,63 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
     setEditValue(cells[cellKey]?.value || '')
   }, [cells])
 
+  // Start editing a cell
+  const startEditingCell = useCallback((cellKey: string) => {
+    setSelectedCell(cellKey)
+    setEditingCell(cellKey)
+    setEditValue(cells[cellKey]?.value || '')
+  }, [cells])
+
+  // AI Automation handlers
+  const handleSmartCompletion = useCallback(async (cellKey: string, value: string) => {
+    if (value.length > 2) {
+      try {
+        // Get context from nearby cells
+        const [col, row] = [cellKey.match(/[A-Z]+/)![0], parseInt(cellKey.match(/\d+/)![0])]
+        const context: string[] = []
+        
+        // Get values from same column (above current cell)
+        for (let i = Math.max(1, row - 3); i < row; i++) {
+          const contextCell = cells[`${col}${i}`]
+          if (contextCell?.value) context.push(contextCell.value)
+        }
+        
+        // Get values from same row (left of current cell)
+        const colIndex = col.charCodeAt(0) - 65
+        for (let i = Math.max(0, colIndex - 3); i < colIndex; i++) {
+          const contextCell = cells[`${String.fromCharCode(65 + i)}${row}`]
+          if (contextCell?.value) context.push(contextCell.value)
+        }
+        
+        const completion = await aiService.suggestCompletion(value, context)
+        
+        if (completion.suggestions.length > 0 && completion.confidence > 0.7) {
+          // Show suggestions (you could implement a dropdown here)
+          console.log('AI Suggestions:', completion.suggestions)
+        }
+      } catch (error) {
+        console.error('Smart completion failed:', error)
+      }
+    }
+  }, [cells])
+
+  const handleAICellsUpdated = useCallback(async (updates: Record<string, string>) => {
+    for (const [cellKey, value] of Object.entries(updates)) {
+      await updateCell(cellKey, value)
+    }
+  }, [updateCell])
+
   // Handle cell edit
   const handleCellEdit = useCallback(async (cellKey: string, value: string) => {
     await updateCell(cellKey, value)
     setEditingCell(null)
     setEditValue('')
-  }, [updateCell])
+    
+    // Trigger smart completion for future suggestions
+    if (value && !value.startsWith('=')) {
+      handleSmartCompletion(cellKey, value)
+    }
+  }, [updateCell, handleSmartCompletion])
 
   // Handle key press
   const handleKeyPress = useCallback((e: React.KeyboardEvent, cellKey: string) => {
@@ -158,8 +213,26 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
     } else if (e.key === 'Escape') {
       setEditingCell(null)
       setEditValue('')
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      // Save current cell and move to next cell
+      handleCellEdit(cellKey, editValue)
+      
+      // Move to next cell in the row
+      const match = cellKey.match(/^([A-Z]+)(\d+)$/)
+      if (match) {
+        const col = match[1]
+        const row = parseInt(match[2])
+        const colIndex = col.charCodeAt(0) - 65
+        const nextColIndex = colIndex + 1
+        
+        if (nextColIndex < cols) {
+          const nextCell = `${String.fromCharCode(65 + nextColIndex)}${row}`
+          startEditingCell(nextCell)
+        }
+      }
     }
-  }, [editValue, handleCellEdit])
+  }, [editValue, handleCellEdit, cols, startEditingCell])
 
   // Navigate with arrow keys
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -282,6 +355,27 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
     URL.revokeObjectURL(url)
   }, [rows, cols, getCellValue])
 
+  // Grid size handlers
+  const handleAddRow = useCallback(() => {
+    setRows(prev => prev + 1)
+  }, [])
+
+  const handleAddColumn = useCallback(() => {
+    setCols(prev => prev + 1)
+  }, [])
+
+  const handleSetRows = useCallback((newRows: number) => {
+    if (newRows > 0 && newRows <= 100) {
+      setRows(newRows)
+    }
+  }, [])
+
+  const handleSetCols = useCallback((newCols: number) => {
+    if (newCols > 0 && newCols <= 26) {
+      setCols(newCols)
+    }
+  }, [])
+
   return (
     <div className="w-full h-full flex flex-col" onKeyDown={handleKeyDown} tabIndex={0}>
       {/* Main Toolbar */}
@@ -312,7 +406,7 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
               type="text"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              onKeyPress={(e) => handleKeyPress(e, selectedCell)}
+              onKeyDown={(e) => handleKeyPress(e, selectedCell)}
               className="text-sm px-2 py-1 border border-gray-300 rounded min-w-[200px]"
               placeholder={translationService.translateUI('enter_formula', currentLanguage)}
             />
@@ -330,6 +424,46 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
             )}
             <span>{translationService.translateUI('apply', currentLanguage)}</span>
           </button>
+          
+          {/* Grid Size Controls */}
+          <div className="flex items-center space-x-2 border-l border-gray-300 pl-4">
+            <span className="text-sm font-medium text-gray-700">Grid:</span>
+            <div className="flex items-center space-x-1">
+              <input
+                type="number"
+                value={rows}
+                onChange={(e) => handleSetRows(parseInt(e.target.value) || 1)}
+                min="1"
+                max="100"
+                className="w-16 text-xs px-1 py-1 border border-gray-300 rounded text-center"
+                title="Rows"
+              />
+              <span className="text-xs text-gray-500">×</span>
+              <input
+                type="number"
+                value={cols}
+                onChange={(e) => handleSetCols(parseInt(e.target.value) || 1)}
+                min="1"
+                max="26"
+                className="w-16 text-xs px-1 py-1 border border-gray-300 rounded text-center"
+                title="Columns"
+              />
+            </div>
+            <button
+              onClick={handleAddRow}
+              className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+              title="Add Row"
+            >
+              +R
+            </button>
+            <button
+              onClick={handleAddColumn}
+              className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+              title="Add Column"
+            >
+              +C
+            </button>
+          </div>
         </div>
         
         {/* Language Selector */}
@@ -343,16 +477,16 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
 
       {/* Spreadsheet Grid */}
       <div className="flex-1 overflow-auto">
-        <div className="inline-block min-w-full">
+        <div className="w-full">
           {/* Column Headers */}
-          <div className="flex border-b border-gray-300">
-            <div className="w-12 h-8 bg-gray-200 border-r border-gray-300 flex items-center justify-center text-xs font-medium text-gray-600">
+          <div className="flex border-b border-gray-300 w-full">
+            <div className="w-12 h-8 bg-gray-200 border-r border-gray-300 flex items-center justify-center text-xs font-medium text-gray-600 flex-shrink-0">
               {/* Empty corner cell */}
             </div>
             {columnHeaders.map((col) => (
               <div
                 key={col}
-                className="w-24 h-8 bg-gray-200 border-r border-gray-300 flex items-center justify-center text-xs font-medium text-gray-600"
+                className="flex-1 min-w-[100px] h-8 bg-gray-200 border-r border-gray-300 flex items-center justify-center text-xs font-medium text-gray-600"
               >
                 {col}
               </div>
@@ -361,9 +495,9 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
 
           {/* Rows */}
           {rowHeaders.map((row) => (
-            <div key={row} className="flex border-b border-gray-300">
+            <div key={row} className="flex border-b border-gray-300 w-full">
               {/* Row Header */}
-              <div className="w-12 h-8 bg-gray-200 border-r border-gray-300 flex items-center justify-center text-xs font-medium text-gray-600">
+              <div className="w-12 h-8 bg-gray-200 border-r border-gray-300 flex items-center justify-center text-xs font-medium text-gray-600 flex-shrink-0">
                 {row}
               </div>
               
@@ -377,7 +511,7 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
                 return (
                   <div
                     key={cellKey}
-                    className={`w-24 h-8 border-r border-gray-300 flex items-center px-1 cursor-pointer ${
+                    className={`flex-1 min-w-[100px] h-8 border-r border-gray-300 flex items-center px-1 cursor-pointer ${
                       isSelected ? 'bg-blue-100 border-blue-300' : 'bg-white hover:bg-gray-50'
                     }`}
                     onClick={() => handleCellClick(cellKey)}
@@ -387,7 +521,7 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
                         type="text"
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        onKeyPress={(e) => handleKeyPress(e, cellKey)}
+                        onKeyDown={(e) => handleKeyPress(e, cellKey)}
                         onBlur={() => handleCellEdit(cellKey, editValue)}
                         className="w-full h-full text-xs border-none outline-none bg-transparent"
                         autoFocus
@@ -404,6 +538,13 @@ export function Spreadsheet({ rows = 20, cols = 10 }: SpreadsheetProps) {
           ))}
         </div>
       </div>
+
+      {/* AI Assistant */}
+      <AIAssistant
+        cells={cells}
+        onApplyFormula={(cell, formula) => updateCell(cell, formula)}
+        onUpdateCells={handleAICellsUpdated}
+      />
     </div>
   )
 }

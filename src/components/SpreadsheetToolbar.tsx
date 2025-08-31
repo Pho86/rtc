@@ -63,7 +63,7 @@ export function SpreadsheetToolbar({ onSave, onLoad, onClear, onExport, currentL
         </div>
 
         {/* Help */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 mr-4">
           <button
             onClick={() => setShowHelp(!showHelp)}
             className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 flex items-center space-x-1"

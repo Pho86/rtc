@@ -31,12 +31,12 @@ function App() {
           <div className="bg-white border-b border-gray-300 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">RTC Sheets</h1>
-                <p className="text-sm text-gray-600">A Google Sheets-like Progressive Web App</p>
+                <h1 className="text-2xl font-bold text-gray-900">Ally Beacon</h1>
+                <p className="text-sm text-gray-600">An AI Sheets Progressive Web App</p>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-500">PWA Ready</span>
+              <div className="flex items-center space-x-2 mr-4">
+                <span className="text-sm text-gray-500 ">PWA Ready</span>
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               </div>
             </div>
