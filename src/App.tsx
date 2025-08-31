@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt'
 import { OfflinePage } from './components/OfflinePage'
+import { Spreadsheet } from './components/Spreadsheet'
 
 function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -25,9 +26,26 @@ function App() {
   return (
     <>
       <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-4xl font-bold text-center text-gray-900 mb-4">RTC App</h1>
-          <p className="text-center text-gray-600 mb-8">Progressive Web App is ready</p>
+        <div className="h-screen flex flex-col">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-300 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">RTC Sheets</h1>
+                <p className="text-sm text-gray-600">A Google Sheets-like Progressive Web App</p>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-500">PWA Ready</span>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Spreadsheet */}
+          <div className="flex-1 bg-white">
+            <Spreadsheet rows={50} cols={15} />
+          </div>
         </div>
       </div>
       <PWAUpdatePrompt />
