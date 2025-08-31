@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt'
 import { OfflinePage } from './components/OfflinePage'
-import { Spreadsheet } from './components/Spreadsheet'
+import { LoginForm } from './components/LoginForm'
+import { ComprehensiveDemo } from './components/ComprehensiveDemo'
+import { authService } from './services/AuthService'
 
 function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated())
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -19,8 +22,21 @@ function App() {
     }
   }, [])
 
+  const handleLogin = () => {
+    setIsAuthenticated(true)
+  }
+
   if (!isOnline) {
     return <OfflinePage />
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <LoginForm onLogin={handleLogin} />
+        <PWAUpdatePrompt />
+      </>
+    )
   }
 
   return (
@@ -31,12 +47,12 @@ function App() {
           <div className="bg-white border-b border-gray-300 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Ally Beacon</h1>
-                <p className="text-sm text-gray-600">An AI Sheets Progressive Web App</p>
+                <h1 className="text-2xl font-bold text-gray-900">RTC Sheets</h1>
+                <p className="text-sm text-gray-600">A Google Sheets-like Progressive Web App</p>
               </div>
               
-              <div className="flex items-center space-x-2 mr-4">
-                <span className="text-sm text-gray-500 ">PWA Ready</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-500">PWA Ready</span>
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               </div>
             </div>
